@@ -1,0 +1,17 @@
+{
+  "name": "tts",
+  "repo": "romingodelfuego/fakinflu-tts-worker",
+  "visibility": "private",
+  "description": "fakinflu RunPod serverless worker: TTS multilingue (Chatterbox Multilingual V3 + Qwen3-TTS 1.7B Base/VoiceDesign, poids bakes) - texte -> wav, clonage de voix optionnel",
+  "endpoint": {
+    "name": "fakinflu-tts-worker",
+    "env_var": "RUNPOD_TTS_ENDPOINT_ID",
+    "gpu_pools": ["AMPERE_24", "ADA_24"],
+    "workers": {"min": 0, "max": 2, "idleTimeout": 5},
+    "timeout_ms": 1200000,
+    "flashboot": "FLASHBOOT",
+    "disk_gb": 20,
+    "env": {},
+    "notes": "Deux moteurs dans deux venvs (transformers 5.2 vs 4.57). ~14 Go de VRAM si les 3 modeles sont charges."
+  }
+}

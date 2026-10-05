@@ -1,0 +1,5 @@
+{"input": {"items": [
+  {"id": "smoke_cb", "engine": "chatterbox", "lang": "fr", "text": "Bonjour, ceci est un test.", "voice": {"mode": "default"}},
+  {"id": "smoke_qw", "engine": "qwen", "lang": "fr", "text": "Bonjour, ceci est un test.",
+   "voice": {"mode": "design", "instruct": "Voix de jeune femme française d'environ 25 ans, naturelle et posée."}}
+]}}
