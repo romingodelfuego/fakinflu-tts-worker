@@ -36,6 +36,8 @@ RUN python3 -m venv /venv/qwen \
 RUN /venv/chatterbox/bin/python -c "from huggingface_hub import snapshot_download as d; \
 d('ResembleAI/chatterbox', allow_patterns=['ve.pt', 't3_mtl23ls_v3.safetensors', 's3gen.pt', \
 'grapheme_mtl_merged_expanded_v1.json', 'conds.pt', 'Cangjie5_TC.json'])"
+# Segmenteur chinois de Chatterbox : sinon telecharge (~35 Mo) a chaque cold start
+RUN /venv/chatterbox/bin/python -c "from spacy_pkuseg import pkuseg; pkuseg()"
 RUN /venv/qwen/bin/python -c "from huggingface_hub import snapshot_download as d; \
 [d(m) for m in ('Qwen/Qwen3-TTS-12Hz-1.7B-Base', 'Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign')]"
 

@@ -5,7 +5,7 @@ Voix : "clone" (Base : ref_wav + ref_text, ou x-vector seul sans ref_text)
        "design" (VoiceDesign : description en langage naturel, ex. "jeune femme de 25 ans").
 Chaque modele est charge a la premiere requete qui en a besoin.
 """
-import os, time
+import glob, os, time
 
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # poids bakes dans l'image
 
@@ -27,10 +27,18 @@ _models = {}
 _prompts = {}  # (ref_wav, ref_text) -> voice_clone_prompt reutilisable
 
 
+def _local(repo):
+    """Dossier du snapshot bake. qwen_tts interroge l'API HF quand on lui passe un id de
+    depot, meme hors ligne ; un chemin local court-circuite tout appel reseau."""
+    hub = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+    snaps = sorted(glob.glob(os.path.join(hub, "models--" + repo.replace("/", "--"), "snapshots", "*")))
+    return snaps[-1] if snaps else repo
+
+
 def _model(kind):
     if kind not in _models:
         _models[kind] = Qwen3TTSModel.from_pretrained(
-            MODELS[kind], device_map="cuda:0" if torch.cuda.is_available() else "cpu",
+            _local(MODELS[kind]), device_map="cuda:0" if torch.cuda.is_available() else "cpu",
             dtype=torch.bfloat16, attn_implementation="sdpa")
     return _models[kind]
 
