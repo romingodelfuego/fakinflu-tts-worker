@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Moteur Qwen3-TTS 12Hz 1.7B (Apache-2.0). Tourne dans /venv/qwen.
 
-Voix : "clone" (Base : ref_wav + ref_text, ou x-vector seul sans ref_text)
-       "design" (VoiceDesign : description en langage naturel, ex. "jeune femme de 25 ans").
+Voix : "clone" (Base : ref_wav + ref_text, ou x-vector seul sans ref_text ; "style" ignore)
+       "design" (VoiceDesign : description en langage naturel, ex. "jeune femme de 25 ans",
+                 completee par le "style" de l'item s'il y en a un).
 Chaque modele est charge a la premiere requete qui en a besoin.
 """
 import glob, os, time
@@ -61,8 +62,8 @@ def process(req):
                                           voice_clone_prompt=_prompts[key], **gen)
     elif mode == "design":
         m = _model("design")
-        wavs, sr = m.generate_voice_design(text=req["text"], language=lang,
-                                           instruct=voice["instruct"], **gen)
+        instruct = ", ".join(s for s in (voice["instruct"], req.get("style") or "") if s)
+        wavs, sr = m.generate_voice_design(text=req["text"], language=lang, instruct=instruct, **gen)
     else:
         raise ValueError(f"qwen : mode de voix non gere : {mode} (clone | design)")
 

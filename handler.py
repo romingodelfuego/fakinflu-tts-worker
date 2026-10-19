@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""fakinflu — worker RunPod : tts (Chatterbox Multilingual V3 + Qwen3-TTS 1.7B).
+"""fakinflu — worker RunPod : tts (Chatterbox Multilingual V3 + Qwen3-TTS 1.7B + VoxCPM2).
 
 Entree :
   {"voices": {"<voice_id>": {"ref_audio": "<b64 wav>", "ref_text": "..."}},   # optionnel
-   "items": [{"id": "...", "engine": "chatterbox|qwen", "text": "...", "lang": "fr|en|...",
-              "voice": {"mode": "clone", "ref": "<voice_id>"}         # les deux moteurs
-                     | {"mode": "design", "instruct": "..."}          # qwen seulement
+   "items": [{"id": "...", "engine": "chatterbox|qwen|voxcpm", "text": "...", "lang": "fr|en|...",
+              "voice": {"mode": "clone", "ref": "<voice_id>"}         # tous les moteurs
+                     | {"mode": "design", "instruct": "..."}          # qwen, voxcpm
                      | {"mode": "default"},                           # chatterbox seulement
+              "style": "direction de jeu en langage naturel",         # voxcpm (+ qwen design)
               "params": {...}, "seed": 42}]}
 Sortie : {"results": [{"id", "audio": "<b64 wav>", "sr", "duration_s", "seconds", "model"} | {"id", "error"}]}
 
-Les deux moteurs exigent des versions de transformers incompatibles (5.2 vs 4.57) :
+Les moteurs exigent des versions de transformers incompatibles (5.2 vs 4.57 vs 4.5x) :
 chacun vit dans son venv et tourne comme sous-process persistant (engines/*_server.py),
-lance a la premiere requete puis garde chaud tant que le worker vit. Une voix de
+lance a la premiere requete puis garde chaud tant que le worker vit. Un seul moteur
+occupe le GPU a la fois : en demarrer un arrete les autres (24 Go ne suffisent pas aux trois). Une voix de
 reference est envoyee UNE fois par job (bloc "voices") et partagee par tous les items.
 """
 import base64, json, os, subprocess, tempfile, time, traceback
@@ -22,6 +24,7 @@ import runpod
 ENGINES = {
     "chatterbox": ("/venv/chatterbox/bin/python", "/app/engines/chatterbox_server.py"),
     "qwen": ("/venv/qwen/bin/python", "/app/engines/qwen_server.py"),
+    "voxcpm": ("/venv/voxcpm/bin/python", "/app/engines/voxcpm_server.py"),
 }
 RESULT_TAG = "@@TTS@@ "
 _procs = {}
@@ -33,6 +36,8 @@ def _engine(name):
         return p
     if name not in ENGINES:
         raise ValueError(f"moteur inconnu : {name} (connus : {', '.join(ENGINES)})")
+    for other in [n for n in _procs if n != name]:
+        _stop(other)
     py, script = ENGINES[name]
     t = time.time()
     p = subprocess.Popen([py, "-u", script], cwd=os.path.dirname(script), text=True,
@@ -41,6 +46,18 @@ def _engine(name):
     print(f"[tts] moteur {name} pret en {time.time() - t:.1f}s", flush=True)
     _procs[name] = p
     return p
+
+
+def _stop(name):
+    p = _procs.pop(name, None)
+    if p is not None and p.poll() is None:
+        p.stdin.close()  # le serveur sort de sa boucle stdin
+        try:
+            p.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+        print(f"[tts] moteur {name} arrete (GPU libere)", flush=True)
 
 
 def _read(p, name):
@@ -78,6 +95,7 @@ def _process(item, voices, tmp):
         voice.setdefault("ref_text", voices[ref].get("ref_text") or "")
     out_path = os.path.join(tmp, f"out_{len(os.listdir(tmp))}.wav")
     res = _call(engine, {"text": item["text"], "lang": item.get("lang", "fr"), "voice": voice,
+                         "style": item.get("style") or "",
                          "params": item.get("params") or {}, "seed": item.get("seed", 42),
                          "out_path": out_path})
     if "error" in res:
