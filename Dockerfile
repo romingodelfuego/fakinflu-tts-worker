@@ -1,7 +1,8 @@
-# fakinflu — worker RunPod : tts (Chatterbox Multilingual V3 + Qwen3-TTS 1.7B, poids BAKES)
+# fakinflu — worker RunPod : tts (Chatterbox Multilingual V3 + Qwen3-TTS 1.7B + VoxCPM2, poids BAKES)
 # Build par RunPod (integration GitHub) a chaque GitHub Release : make worker-release W=tts
 #
-# Deux venvs : chatterbox-tts epingle transformers==5.2.0, qwen-tts transformers==4.57.3.
+# Un venv par moteur : chatterbox-tts epingle transformers==5.2.0, qwen-tts transformers==4.57.3,
+# voxcpm ses propres deps (librosa, funasr...).
 # Le handler (python systeme + runpod) pilote chaque moteur comme sous-process de son venv.
 ARG CUDA_TAG=12.4.1-cudnn-runtime-ubuntu22.04
 FROM nvidia/cuda:${CUDA_TAG}
@@ -32,7 +33,15 @@ RUN python3 -m venv /venv/qwen \
  && /venv/qwen/bin/pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124 \
  && /venv/qwen/bin/pip install qwen-tts==0.1.1 soundfile
 
-# --- Poids BAKES (~12 Go) : aucun telechargement au cold start ---
+# --- VoxCPM2 : torch epingle (sinon pip tire la derniere version et ses wheels CUDA) ---
+ARG VOXCPM_VERSION=2.0.3
+RUN python3 -m venv /venv/voxcpm \
+ && /venv/voxcpm/bin/pip install --upgrade pip setuptools wheel \
+ && /venv/voxcpm/bin/pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124 \
+ && printf "torch==2.6.0\ntorchaudio==2.6.0\n" > /tmp/torch.txt \
+ && /venv/voxcpm/bin/pip install -c /tmp/torch.txt voxcpm==${VOXCPM_VERSION} soundfile
+
+# --- Poids BAKES (~17 Go) : aucun telechargement au cold start ---
 RUN /venv/chatterbox/bin/python -c "from huggingface_hub import snapshot_download as d; \
 d('ResembleAI/chatterbox', allow_patterns=['ve.pt', 't3_mtl23ls_v3.safetensors', 's3gen.pt', \
 'grapheme_mtl_merged_expanded_v1.json', 'conds.pt', 'Cangjie5_TC.json'])"
@@ -40,6 +49,7 @@ d('ResembleAI/chatterbox', allow_patterns=['ve.pt', 't3_mtl23ls_v3.safetensors',
 RUN /venv/chatterbox/bin/python -c "from spacy_pkuseg import pkuseg; pkuseg()"
 RUN /venv/qwen/bin/python -c "from huggingface_hub import snapshot_download as d; \
 [d(m) for m in ('Qwen/Qwen3-TTS-12Hz-1.7B-Base', 'Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign')]"
+RUN /venv/voxcpm/bin/python -c "from huggingface_hub import snapshot_download as d; d('openbmb/VoxCPM2')"
 
 COPY engines/ /app/engines/
 COPY handler.py /app/handler.py
