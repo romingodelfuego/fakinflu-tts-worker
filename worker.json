@@ -20,5 +20,6 @@
     "disk_gb": 30,
     "env": {},
     "notes": "Un venv par moteur (transformers incompatibles). Un seul moteur charge a la fois sur le GPU (le handler arrete les autres) : max ~8 Go de VRAM."
-  }
+  },
+  "version": "v1.1.0"
 }
