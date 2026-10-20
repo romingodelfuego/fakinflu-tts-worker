@@ -21,7 +21,9 @@ MODEL_ID = os.environ.get("VOXCPM_MODEL", "openbmb/VoxCPM2")
 PARAMS = {"cfg_value": float, "inference_timesteps": int}
 
 # optimize=False : pas de torch.compile (compilation longue au cold start, triton requis)
-model = VoxCPM.from_pretrained(MODEL_ID, load_denoiser=False, optimize=False, local_files_only=True)
+# VOXCPM_DEVICE : force le device (cpu, cuda...) ; par defaut VoxCPM choisit (CUDA, puis MPS, puis CPU)
+model = VoxCPM.from_pretrained(MODEL_ID, load_denoiser=False, optimize=False, local_files_only=True,
+                               device=os.environ.get("VOXCPM_DEVICE") or None)
 SR = model.tts_model.sample_rate
 
 

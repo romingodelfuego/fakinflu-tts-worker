@@ -33,13 +33,17 @@ RUN python3 -m venv /venv/qwen \
  && /venv/qwen/bin/pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124 \
  && /venv/qwen/bin/pip install qwen-tts==0.1.1 soundfile
 
-# --- VoxCPM2 : torch epingle (sinon pip tire la derniere version et ses wheels CUDA) ---
+# --- VoxCPM2 : paquet SANS ses deps (il tire gradio, funasr, modelscope, datasets... inutiles a
+# l'inference, et un resolver qui explose : "resolution-too-deep"), puis les seules deps
+# d'execution, epinglees, en petites couches.
 ARG VOXCPM_VERSION=2.0.3
 RUN python3 -m venv /venv/voxcpm \
  && /venv/voxcpm/bin/pip install --upgrade pip setuptools wheel \
- && /venv/voxcpm/bin/pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124 \
- && printf "torch==2.6.0\ntorchaudio==2.6.0\n" > /tmp/torch.txt \
- && /venv/voxcpm/bin/pip install -c /tmp/torch.txt voxcpm==${VOXCPM_VERSION} soundfile
+ && /venv/voxcpm/bin/pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+RUN /venv/voxcpm/bin/pip install "transformers==4.57.3" "safetensors==0.6.2" "einops==0.8.1" "pydantic==2.11.7" "tqdm==4.67.1"
+RUN /venv/voxcpm/bin/pip install "librosa==0.11.0" "soundfile==0.13.1" "inflect==7.5.0" "wetext==0.1.8" "regex==2025.9.18"
+RUN /venv/voxcpm/bin/pip install --no-deps "voxcpm==${VOXCPM_VERSION}" \
+ && /venv/voxcpm/bin/python -c "import torch; from voxcpm import VoxCPM; assert torch.__version__.startswith('2.6.0'), torch.__version__"
 
 # --- Poids BAKES (~17 Go) : aucun telechargement au cold start ---
 RUN /venv/chatterbox/bin/python -c "from huggingface_hub import snapshot_download as d; \
